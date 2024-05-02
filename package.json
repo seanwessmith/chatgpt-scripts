@@ -1,0 +1,18 @@
+{
+  "name": "chatgpt-scripts",
+  "module": "index.ts",
+  "type": "module",
+  "devDependencies": {
+    "@types/bun": "1.1.1"
+  },
+  "peerDependencies": {
+    "typescript": "^5.4.5"
+  },
+  "dependencies": {
+    "openai": "^4.39.1"
+  },
+  "scripts": {
+    "build:docker": "bun build src/ai-art-historian.ts --outdir ./dist --target bun",
+    "gcloud:run:deploy": "gcloud builds submit --quiet --tag gcr.io/gamertech-hardware/webhooks && gcloud run deploy gamertech-hardware-webhooks --image gcr.io/gamertech-hardware/webhooks --platform managed --region us-central1 --timeout 3600 --memory 2Gi --cpu 2 --concurrency 1"
+  }
+}
