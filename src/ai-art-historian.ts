@@ -1,15 +1,50 @@
 import OpenAI from "openai";
-import fs from "fs";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
   dangerouslyAllowBrowser: true,
 });
 
-async function aiArtHistorian() {
-  const imageSrc = __dirname + "/assets/image-one.png";
-  const base64Image = fs.readFileSync(imageSrc, { encoding: "base64" });
-  console.log("base64Image", base64Image.slice(0, 100));
+function isValidBase64String(base64String: string): boolean {
+  const regex = /^data:image\/[a-z]+;base64,/;
+  return regex.test(base64String);
+}
+
+async function aiArtHistorian(req: Request): Promise<Response> {
+  let json: any;
+  try {
+    json = await req.json();
+  } catch (e) {
+    return new Response(JSON.stringify({ error: "Invalid JSON" }), {
+      status: 400,
+    });
+  }
+
+  const base64Image = json.image as string;
+  if (!base64Image) {
+    return new Response(JSON.stringify({ error: "No image found in body" }), {
+      status: 400,
+    });
+  }
+
+  if (!isValidBase64String(base64Image)) {
+    return new Response(JSON.stringify({ error: "Invalid base64 string" }), {
+      status: 400,
+    });
+  }
+
+  // check if the image is too large
+  var stringLength = base64Image.length - "data:image/jpeg;base64,".length;
+  var sizeInBytes = 4 * Math.ceil(stringLength / 3) * 0.5624896334383812;
+  var sizeInKb = sizeInBytes / 1000;
+  console.log("sizeInKb", sizeInKb);
+  if (sizeInKb > 20000) {
+    return new Response(
+      JSON.stringify({ error: "Image is too large. Max size is 20 MB" }),
+      { status: 400 }
+    );
+  }
+
   const response = await openai.chat.completions.create({
     model: "gpt-4-turbo",
     messages: [
@@ -23,7 +58,7 @@ async function aiArtHistorian() {
           {
             type: "image_url",
             image_url: {
-              url: `data:image/jpeg;base64,${base64Image}`,
+              url: base64Image,
             },
           },
         ],
@@ -31,17 +66,17 @@ async function aiArtHistorian() {
     ],
   });
 
-  return response.choices[0].message.content;
+  return new Response(JSON.stringify(response.choices[0].message.content), {
+    headers: { "Content-Type": "application/json" },
+  });
 }
 
+// Assuming Bun is your HTTP server
 Bun.serve({
   port: 8080,
   hostname: "0.0.0.0",
-  async fetch() {
+  async fetch(req) {
     console.log("Running AI Art Historian...");
-    const response = await aiArtHistorian();
-    return new Response(JSON.stringify(response), {
-      headers: { "Content-Type": "application/json" },
-    });
+    return await aiArtHistorian(req);
   },
 });
